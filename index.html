@@ -1,0 +1,739 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리동네 빈자리 어린이집 찾기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+
+<style>
+  :root{
+    --paper:#EDF1EA; --card:#FFFFFF; --ink:#16302A; --ink-soft:#5D6F68; --line:#D5DED4;
+    --green:#2E7256; --green-pale:#DCE9DE; --marigold:#C8830A; --marigold-pale:#F6EBD2;
+    --brick:#A0553F; --brick-pale:#F1E2DC; --blue:#3F5B84; --blue-pale:#E7EDF6; --r:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    font-size:15px; line-height:1.62; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:560px; margin:0 auto; padding:0 18px 56px}
+
+  header{padding:36px 0 22px; text-align:center}
+  .eyebrow{font-size:11px; letter-spacing:.22em; color:var(--green); font-weight:700; margin-bottom:14px}
+  h1{font-family:'Gowun Batang',serif; font-weight:700; font-size:29px; line-height:1.38; margin:0 0 10px; letter-spacing:-.01em}
+  h1 em{font-style:normal; color:var(--green); position:relative; white-space:nowrap}
+  h1 em::after{content:''; position:absolute; left:0; right:0; bottom:2px; height:8px; background:var(--green-pale); z-index:-1}
+  .sub{color:var(--ink-soft); font-size:13.5px; margin:0}
+  .sync{display:flex; align-items:center; justify-content:center; gap:7px; margin:16px auto 0;
+    padding:8px 14px; width:fit-content; background:#fff; border:1px solid var(--line);
+    border-radius:999px; font-size:12px; color:var(--ink-soft)}
+  .sync .pulse{width:7px; height:7px; border-radius:50%; background:var(--green); flex:none}
+  .sync b{color:var(--ink); font-weight:700}
+
+  .step{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:20px 18px; margin-bottom:14px}
+  .step-head{display:flex; align-items:center; gap:9px; margin-bottom:4px}
+  .step-no{font-family:'Gowun Batang',serif; font-size:13px; font-weight:700; color:var(--green);
+    background:var(--green-pale); width:22px; height:22px; border-radius:50%; display:grid; place-items:center; flex:none}
+  .step-title{font-weight:700; font-size:16px}
+  .step-hint{color:var(--ink-soft); font-size:12.5px; margin:0 0 14px 31px}
+
+  label.fld{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px}
+  input[type=text], select{width:100%; padding:12px 13px; font-size:15px; font-family:inherit; color:var(--ink);
+    background:#fff; border:1.5px solid var(--line); border-radius:10px; outline:none}
+  input[type=text]:focus, select:focus{border-color:var(--green); box-shadow:0 0 0 3px var(--green-pale)}
+  .example{margin-top:9px; font-size:12.5px; color:var(--ink-soft); line-height:1.55}
+  .example b{color:var(--green); font-weight:700}
+  .parsed{margin-top:11px; padding:11px 13px; border-radius:10px; font-size:13px; display:none; line-height:1.5}
+  .parsed.on{display:block}
+  .parsed.ok{background:var(--green-pale); color:#2A5B48}
+  .parsed.warn{background:var(--marigold-pale); color:#6B5316}
+  .age-out{margin-top:13px; padding:14px 15px; border-radius:10px; background:var(--green-pale);
+    font-size:13.5px; display:none; line-height:1.6}
+  .age-out.on{display:block}
+  .age-out b{font-size:17px; font-family:'Gowun Batang',serif; display:block; margin-bottom:6px}
+
+  button.go{width:100%; margin-top:6px; padding:15px; cursor:pointer; font-family:inherit;
+    font-size:15.5px; font-weight:700; color:#fff; background:var(--green); border:0; border-radius:11px}
+  button.go:hover{background:#245C46}
+  button.go:disabled{background:#B6C4BC; cursor:not-allowed}
+
+  #picker{display:none; margin-top:26px}
+  #picker.on{display:block}
+  .pick-head{font-size:13.5px; margin:0 0 12px; color:var(--ink-soft)}
+  .pick-head b{color:var(--ink)}
+  .pick{width:100%; text-align:left; cursor:pointer; font-family:inherit; font-size:15px;
+    background:var(--card); border:1px solid var(--line); border-radius:11px; padding:14px 16px;
+    margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px}
+  .pick:hover{border-color:var(--green)}
+  .pick .place{font-weight:700}
+  .pick .up{display:block; font-size:12.5px; color:var(--ink-soft); font-weight:400; margin-top:2px}
+  .pick .cnt{font-size:12px; color:var(--green); flex:none; font-weight:700}
+
+  #results{margin-top:26px; display:none}
+  #results.on{display:block}
+  .res-head h2{font-family:'Gowun Batang',serif; font-size:20px; margin:0 0 10px; font-weight:700}
+  .res-head p{margin:0; font-size:13px; color:var(--ink-soft)}
+  .res-head .lede{font-size:17px; line-height:1.5; color:var(--ink); font-weight:700;
+    background:var(--green-pale); border-radius:11px; padding:14px 16px; margin:0 0 4px}
+  .res-head .count{color:var(--green); font-size:22px; font-family:'Gowun Batang',serif}
+  .stamp{font-size:11.5px; color:#7A8A83; margin:8px 0 0}
+  .notice{margin:14px 0 0; padding:14px 15px; border-radius:11px; background:var(--marigold-pale);
+    font-size:12.5px; line-height:1.6; color:#6B5316}
+  .notice b{color:var(--marigold)}
+  .group-label{font-size:11.5px; font-weight:700; letter-spacing:.1em; color:var(--ink-soft);
+    margin:22px 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line)}
+
+  .cc{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:17px; margin-bottom:10px}
+  .cc.now{border-color:var(--green); border-width:1.5px}
+  .cc-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px}
+  .cc-name{font-size:16.5px; font-weight:700; line-height:1.35; margin:0 0 3px}
+  .cc-type{font-size:12px; color:var(--ink-soft)}
+  .badge{font-size:14px; font-weight:700; padding:8px 13px; border-radius:10px; white-space:nowrap; line-height:1.3; flex:none}
+  .badge.now{background:var(--marigold); color:#fff; font-size:15.5px}
+  .badge.queue{background:var(--marigold-pale); color:var(--marigold)}
+  .badge.empty0{background:var(--green-pale); color:var(--green)}
+  .badge.full{background:var(--brick-pale); color:var(--brick)}
+  .badge.none{background:#ECEFEA; color:#7C8A83}
+  .badge.wait{background:var(--blue-pale); color:var(--blue)}
+
+  .facts{margin:14px 0 0; border-top:1px solid var(--line); padding-top:12px}
+  .fact{display:flex; gap:12px; padding:5px 0; font-size:14px; align-items:baseline}
+  .fact .k{flex:none; width:56px; font-size:12.5px; color:var(--ink-soft)}
+  .fact .v{font-weight:700}
+  .fact .v.free{color:var(--marigold)}
+  .fact .v.full{color:var(--brick)}
+  .fact .v.good{color:var(--green)}
+  .fact .v.unknown{color:var(--blue)}
+  .fact a{color:var(--green); font-weight:700; text-decoration:none;
+    display:inline-flex; align-items:center; gap:6px; border-bottom:1.5px solid var(--green-pale)}
+  .fact a:hover{border-bottom-color:var(--green)}
+  .fact a .tag{font-size:11px; font-weight:700; color:#fff; background:var(--green);
+    padding:2px 7px; border-radius:999px}
+
+  .seats{margin:13px 0 0; padding:13px 14px; background:#F7F9F6; border-radius:10px}
+  .seats-cap{font-size:11.5px; color:var(--ink-soft); display:flex; justify-content:space-between; margin-bottom:9px}
+  .seats-cap b{color:var(--ink); font-weight:700}
+  .dots{display:flex; flex-wrap:wrap; gap:5px}
+  .dot{width:13px; height:13px; border-radius:50%; flex:none}
+  .dot.filled{background:var(--green)}
+  .dot.free{background:#fff; border:1.5px dashed var(--marigold)}
+  .dot.queue{background:#E8D6AE}
+  .seats-note{margin-top:9px; font-size:11.5px; color:var(--ink-soft); line-height:1.5}
+  .low-ratio{display:inline-block; margin-top:9px; font-size:11.5px; font-weight:700;
+    color:var(--green); background:var(--green-pale); padding:3px 9px; border-radius:999px}
+
+  .verify{margin-top:12px; padding:11px 13px; border-radius:9px; background:var(--brick-pale);
+    color:#7A3E2C; font-size:12.5px; line-height:1.55; display:flex; gap:8px}
+  .verify .mark{flex:none; font-weight:700}
+  .homebtn{width:100%; margin-top:12px; display:flex; align-items:center; justify-content:center; gap:9px;
+    cursor:pointer; background:#fff; border:1.5px solid var(--green); border-radius:10px;
+    padding:14px 13px; font-family:inherit; font-size:14.5px; font-weight:700; color:var(--green);
+    line-height:1.4; text-align:center}
+  .homebtn:hover{background:var(--green-pale)}
+  .homebtn svg{width:26px; height:26px; display:block; flex:none}
+
+  .empty{background:var(--card); border:1px dashed var(--line); border-radius:var(--r);
+    padding:26px 20px; text-align:center; color:var(--ink-soft); font-size:13.5px}
+  .empty b{display:block; color:var(--ink); font-size:15px; margin-bottom:7px; font-family:'Gowun Batang',serif}
+
+  .sheet-bg{position:fixed; inset:0; background:rgba(10,28,22,.5); display:none; z-index:50}
+  .sheet-bg.on{display:block}
+  .sheet{position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:100%; max-width:560px;
+    max-height:88vh; overflow-y:auto; background:var(--paper); border-radius:18px 18px 0 0;
+    padding:22px 18px 34px; z-index:51; display:none}
+  .sheet.on{display:block}
+  .sheet-grip{width:38px; height:4px; border-radius:2px; background:#C3CFC7; margin:0 auto 18px}
+  .sheet h3{font-family:'Gowun Batang',serif; font-size:21px; margin:0 0 4px; line-height:1.35}
+  .sheet .kind{font-size:12.5px; color:var(--ink-soft); margin:0 0 16px}
+  .sheet section{background:#fff; border:1px solid var(--line); border-radius:12px; padding:15px 16px; margin-bottom:10px}
+  .sheet h4{font-size:11.5px; letter-spacing:.1em; font-weight:700; color:var(--ink-soft); margin:0 0 11px}
+  .agerow{display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:9px 0; border-bottom:1px solid #EEF2EE; font-size:13.5px}
+  .agerow:last-child{border-bottom:0}
+  .agerow.me{background:var(--green-pale); margin:0 -8px; padding:9px 8px; border-radius:7px; border-bottom:0}
+  .agerow .lab{font-weight:700}
+  .agerow .val{color:var(--ink-soft); font-size:12.5px; text-align:right}
+  .agerow .val b{color:var(--marigold)}
+  .agerow .val .q{color:var(--brick)}
+  .sheet .line{display:flex; gap:12px; font-size:13.5px; padding:5px 0}
+  .sheet .line .k{flex:none; width:64px; font-size:12.5px; color:var(--ink-soft)}
+  .sheet .line a{color:var(--green); font-weight:700; text-decoration:none}
+  .outlink{display:flex; justify-content:space-between; align-items:center; padding:13px 15px;
+    background:#fff; border:1px solid var(--line); border-radius:11px; margin-bottom:8px;
+    color:var(--ink); text-decoration:none; font-size:14px; font-weight:700}
+  .outlink:hover{border-color:var(--green)}
+  .outlink span.ds{display:block; font-size:11.5px; color:var(--ink-soft); font-weight:400; margin-top:2px}
+  .outlink .ar{color:#96A79E; flex:none; font-weight:400}
+  .callbtn{display:block; margin-top:10px; padding:13px; text-align:center; border-radius:10px;
+    background:var(--green); color:#fff !important; font-weight:700; font-size:14.5px; text-decoration:none}
+  .closebtn{width:100%; margin-top:8px; padding:14px; border:0; border-radius:11px; cursor:pointer;
+    font-family:inherit; font-size:15px; font-weight:700; background:var(--ink); color:#fff}
+
+  .apply{margin-top:28px; background:var(--ink); border-radius:var(--r); padding:22px 19px; color:#DDE7E1}
+  .apply h3{font-family:'Gowun Batang',serif; font-size:17px; margin:0 0 12px; color:#fff}
+  .apply a{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 15px;
+    margin-bottom:8px; border-radius:10px; background:rgba(255,255,255,.07); color:#fff; text-decoration:none; font-size:14px}
+  .apply a span.nm{font-weight:700}
+  .apply a span.ds{display:block; font-size:11.5px; color:#9DB3AA; font-weight:400; margin-top:2px}
+  .apply a span.ar{color:#7E948B; flex:none}
+  .apply a.primary{background:var(--green); padding:17px 18px; margin-bottom:6px}
+  .apply a.primary:hover{background:#37886A}
+  .apply a.primary span.nm{font-size:16.5px}
+  .apply a.primary span.ds{color:#CDE5D8; font-size:12.5px}
+  .apply a.primary span.ar{color:#fff; font-size:22px; line-height:1; width:36px; height:36px;
+    border-radius:50%; background:rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center}
+  .apply .cap{margin:0 0 18px; font-size:11.5px; color:#8AA298; line-height:1.5}
+  .apply .divider{margin:20px 0 12px; padding-top:16px; border-top:1px solid rgba(255,255,255,.12);
+    font-size:11.5px; letter-spacing:.1em; font-weight:700; color:#8AA298}
+  .apply a.secondary{background:transparent; border:1px solid rgba(255,255,255,.16); padding:12px 15px; font-size:13.5px}
+
+  .disclaimer{margin-top:20px; font-size:11.5px; color:#7A8A83; line-height:1.65;
+    padding:14px 15px; background:rgba(255,255,255,.5); border-radius:10px}
+  .disclaimer b{color:var(--brick)}
+  @media (prefers-reduced-motion:no-preference){
+    .cc,.pick,.outlink{transition:border-color .15s} button.go,.apply a,.callbtn,.homebtn{transition:all .15s}
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">처음 어린이집 보내는 부모들의</div>
+  <h1>우리동네 <em>빈자리 어린이집</em><br>찾기</h1>
+  <p class="sub">아이 나이에 맞는 반의 빈자리와 대기 인원을 함께 알려드립니다</p>
+  <div class="sync"><span class="pulse"></span>매일 오전 7시 업데이트 · 최근 갱신 <b id="lastSync">—</b></div>
+</header>
+
+<section class="step">
+  <div class="step-head"><div class="step-no">1</div><div class="step-title">아이가 태어난 해</div></div>
+  <p class="step-hint">태어난 연도만 넣으면 몇 세 반에 들어가는지 계산해 드려요</p>
+  <label class="fld" for="birth">출생연도</label>
+  <select id="birth"><option value="">선택하세요</option></select>
+  <div class="age-out" id="ageOut"></div>
+</section>
+
+<section class="step">
+  <div class="step-head"><div class="step-no">2</div><div class="step-title">어린이집을 찾을 동네</div></div>
+  <p class="step-hint">도로명까지만 적으시면 됩니다. 건물번호나 동·호수는 필요 없어요</p>
+  <label class="fld" for="loc">우리 집 주소</label>
+  <input type="text" id="loc" placeholder="예) 경기도 하남시 감일순환로">
+  <div class="parsed" id="parsed"></div>
+  <p class="example">도로명으로 적어주세요. <b>경기도 하남시 감일순환로</b> · <b>서울 성북구 정릉로</b> 처럼요.<br>
+    동 이름이 더 익숙하시면 <b>하남시 감일동</b> 이라고 적으셔도 찾아드립니다.</p>
+</section>
+
+<button class="go" id="search" disabled>빈자리 어린이집 찾기</button>
+
+<section id="picker"></section>
+<section id="results"></section>
+
+<section class="apply">
+  <h3>자리를 확인했다면, 신청은 여기서</h3>
+  <a class="primary" href="https://enter.childinfo.go.kr" target="_blank" rel="noopener">
+    <span><span class="nm">유보통합포털에서 입소대기 신청하기</span>
+    <span class="ds">회원가입 → 아동등록 → 어린이집 검색 → 입소대기 신청</span></span><span class="ar">↗</span></a>
+  <p class="cap">자녀를 먼저 등록해야 그 아이 이름으로 대기를 걸 수 있습니다. 연중 언제든 신청할 수 있고,
+    어린이집에 다니지 않는 아이는 최대 3곳, 이미 다니는 아이는 최대 2곳까지 걸어둘 수 있어요.
+    기존 아이사랑 아이디로 그대로 로그인됩니다.</p>
+  <div class="divider">신청 말고 이런 것도</div>
+  <a class="secondary" href="https://www.childcare.go.kr" target="_blank" rel="noopener">
+    <span><span class="nm">임신육아종합포털 아이사랑</span><span class="ds">보육료 결제 · 시간제 보육 예약 · 육아 상담</span></span><span class="ar">↗</span></a>
+</section>
+
+<p class="disclaimer">
+  <b>지금은 시연용 예시 숫자로 동작합니다.</b> 어린이집정보공개포털 운영계정 인증키를 넣으면 실제 데이터로 바뀝니다.
+  감일동 어린이집은 이름·주소·전화번호만 실제 정보이고 정원·현원은 비워 두었습니다.
+  공개 자료는 실시간이 아니므로 빈자리는 <b>확정된 결원이 아니라 추정치</b>입니다.
+  입력하신 주소는 이 기기 밖으로 전송되지 않습니다.
+</p>
+
+</div>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetName"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   어린이집정보공개포털 OPEN API 연동 설정
+   서비스 ID : cpmsapi030 (어린이집별 기본정보 조회)
+
+   ⚠ 인증키는 이 파일에 절대 적지 마세요. 브라우저에서 보입니다.
+     서버(수집 배치)에서 환경변수로 관리하고, 이 앱은 서버가 만들어
+     둔 결과 파일만 읽는 구조로 가야 합니다.
+   ⚠ 브라우저에서 api.childcare.go.kr 을 직접 부를 수 없습니다.
+     (http 주소 + CORS 제한). 반드시 서버를 거쳐야 합니다.
+   ═══════════════════════════════════════════════════════════ */
+const API = {
+  url      : 'http://api.childcare.go.kr/mediate/rest/cpmsapi030/cpmsapi030/request',
+  dataUrl  : './data/childcare.json',  // 서버 배치가 매일 07:00에 갱신할 파일
+  useLive  : false                     // 서버 연동이 준비되면 true
+};
+
+/* API 응답(XML) → 앱 레코드. 서버 수집 스크립트에서도 그대로 씁니다. */
+function parseApiXml(xmlText){
+  const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+  const num = (el, tag) => {
+    const t = el.getElementsByTagName(tag)[0];
+    const v = t ? parseInt(t.textContent, 10) : NaN;
+    return isNaN(v) ? null : v;
+  };
+  const str = (el, tag) => {
+    const t = el.getElementsByTagName(tag)[0];
+    return t ? t.textContent.trim() : '';
+  };
+  return [...doc.getElementsByTagName('item')].map(el => {
+    const rec = {
+      sidoname:str(el,'sidoname'), sigunguname:str(el,'sigunguname'), stcode:str(el,'stcode'),
+      crname:str(el,'crname'), crtypename:str(el,'crtypename'), crstatusname:str(el,'crstatusname'),
+      craddr:str(el,'craddr'), crtelno:str(el,'crtelno'),
+      crcapat:num(el,'crcapat'), crchcnt:num(el,'crchcnt'),
+      la:str(el,'la'), lo:str(el,'lo'),
+      em_cnt_a2:num(el,'em_cnt_a2'),            // 보육교사 수 (원장·조리원 제외)
+      datastdrdt:str(el,'datastdrdt')
+    };
+    for(let a = 0; a <= 5; a++){
+      const k = '0' + a;
+      rec['class_cnt_' + k] = num(el, 'class_cnt_' + k);   // 반 수
+      rec['child_cnt_' + k] = num(el, 'child_cnt_' + k);   // 아동 수
+      rec['ew_cnt_' + k]    = num(el, 'ew_cnt_' + k);      // 입소대기 아동 수
+    }
+    return rec;
+  }).filter(r => r.crstatusname !== '폐지');
+}
+
+/* 서버가 만들어 둔 결과 파일 읽기 (useLive = true 일 때) */
+async function loadLive(){
+  const res = await fetch(API.dataUrl, {cache:'no-store'});
+  if(!res.ok) throw new Error('데이터 파일을 읽지 못했습니다');
+  return res.json();
+}
+
+/* ── 기준 ── */
+const LEGAL   = {0:3, 1:5, 2:7, 3:15, 4:20, 5:20};   // 교사 대 아동 비율(법정)
+const REDUCED = {0:2};                                // 2026년 0세반 개선 비율
+const AGE_LABEL = {0:'만 0세반',1:'만 1세반',2:'만 2세반',3:'만 3세반',4:'만 4세반',5:'만 5세반'};
+const BIRTH_OPTIONS = [
+  {a:0, label:'2026년생 · 2025년생  (만 0세반)'},
+  {a:1, label:'2024년생  (만 1세반)'},
+  {a:2, label:'2023년생  (만 2세반)'},
+  {a:3, label:'2022년생  (만 3세반)'},
+  {a:4, label:'2021년생  (만 4세반)'},
+  {a:5, label:'2020년생  (만 5세반)'}
+];
+
+/* ── 데이터 (API 필드명 그대로. 운영키 연결 시 그대로 대체됩니다) ── */
+function mk(o){ return o; }
+const SAMPLE = [
+ /* 하남시 감일동 — 이름·주소·전화만 실제. 정원·현원·대기는 미연결(null) */
+ mk({crname:'하남시립별가람어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일백제로 65-2',crtelno:'02-402-6520'}),
+ mk({crname:'시립숲누리어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 524 (감일스윗시티 7단지 관리동)',crtelno:'02-6326-8624'}),
+ mk({crname:'시립감일한별어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 535 관리동',crtelno:'02-404-7942'}),
+ mk({crname:'시립청아어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 523',crtelno:'02-471-0888'}),
+ mk({crname:'시립아이편한어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일중앙로 20-1',crtelno:'02-6407-0071'}),
+ mk({crname:'시립라라어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 389-7',crtelno:'02-449-9900'}),
+ mk({crname:'서머힐어린이집',crtypename:'민간',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 249-5',crtelno:'02-449-5278'}),
+ mk({crname:'파란하늘어린이집',crtypename:'부모협동',sidoname:'경기도',sigunguname:'하남시',_emd:'감일동',craddr:'경기도 하남시 감일동 376-36',crtelno:'02-3401-7813'}),
+ mk({crname:'시립감일꿈꾸는어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감북동',craddr:'경기도 하남시 감북동 446 (감일스윗시티 3단지)',crtelno:'02-640-0301'}),
+ mk({crname:'시립감일리틀포레어린이집',crtypename:'국공립',sidoname:'경기도',sigunguname:'하남시',_emd:'감북동',craddr:'경기도 하남시 감북동 533 관리동',crtelno:'02-470-0135'}),
+
+ /* 아래는 화면 동작 시연용 예시 숫자 */
+ mk({crname:'정릉숲속어린이집',crtypename:'국공립',sidoname:'서울특별시',sigunguname:'성북구',_emd:'정릉동',
+   craddr:'서울특별시 성북구 정릉로 128',crtelno:'02-914-2233',crcapat:49,crchcnt:44,em_cnt_a2:9,_red:[0],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:0, class_cnt_01:2,child_cnt_01:8,ew_cnt_01:1,
+   class_cnt_02:2,child_cnt_02:13,ew_cnt_02:4, class_cnt_03:1,child_cnt_03:12,ew_cnt_03:0,
+   class_cnt_04:1,child_cnt_04:9,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'아리랑가정어린이집',crtypename:'가정',sidoname:'서울특별시',sigunguname:'성북구',_emd:'정릉동',
+   craddr:'서울특별시 성북구 아리랑로19길 7',crtelno:'02-916-7781',crcapat:20,crchcnt:14,em_cnt_a2:4,_red:[],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:0, class_cnt_01:1,child_cnt_01:4,ew_cnt_01:0,
+   class_cnt_02:1,child_cnt_02:6,ew_cnt_02:2, class_cnt_03:0,child_cnt_03:0,ew_cnt_03:0,
+   class_cnt_04:0,child_cnt_04:0,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'북한산어린이집',crtypename:'민간',sidoname:'서울특별시',sigunguname:'성북구',_emd:'정릉동',
+   craddr:'서울특별시 성북구 보국문로 45',crtelno:'02-909-3040',crcapat:60,crchcnt:59,em_cnt_a2:11,_red:[],
+   class_cnt_00:1,child_cnt_00:3,ew_cnt_00:6, class_cnt_01:2,child_cnt_01:10,ew_cnt_01:9,
+   class_cnt_02:2,child_cnt_02:14,ew_cnt_02:5, class_cnt_03:1,child_cnt_03:15,ew_cnt_03:2,
+   class_cnt_04:1,child_cnt_04:17,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'정릉햇살어린이집',crtypename:'사회복지법인',sidoname:'서울특별시',sigunguname:'성북구',_emd:'정릉동',
+   craddr:'서울특별시 성북구 솔샘로 210',crtelno:'02-918-5566',crcapat:75,crchcnt:61,em_cnt_a2:14,_red:[0],
+   class_cnt_00:2,child_cnt_00:2,ew_cnt_00:0, class_cnt_01:2,child_cnt_01:9,ew_cnt_01:0,
+   class_cnt_02:2,child_cnt_02:12,ew_cnt_02:1, class_cnt_03:1,child_cnt_03:14,ew_cnt_03:0,
+   class_cnt_04:1,child_cnt_04:12,ew_cnt_04:0, class_cnt_05:1,child_cnt_05:10,ew_cnt_05:0}),
+
+ mk({crname:'연남어린이집',crtypename:'국공립',sidoname:'서울특별시',sigunguname:'마포구',_emd:'연남동',
+   craddr:'서울특별시 마포구 성미산로 152',crtelno:'02-337-1122',crcapat:54,crchcnt:52,em_cnt_a2:10,_red:[0],
+   class_cnt_00:1,child_cnt_00:2,ew_cnt_00:3, class_cnt_01:2,child_cnt_01:10,ew_cnt_01:7,
+   class_cnt_02:2,child_cnt_02:13,ew_cnt_02:4, class_cnt_03:1,child_cnt_03:14,ew_cnt_03:1,
+   class_cnt_04:1,child_cnt_04:12,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'경의선숲길가정어린이집',crtypename:'가정',sidoname:'서울특별시',sigunguname:'마포구',_emd:'연남동',
+   craddr:'서울특별시 마포구 동교로51길 22',crtelno:'02-336-8890',crcapat:20,crchcnt:12,em_cnt_a2:4,_red:[],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:0, class_cnt_01:1,child_cnt_01:3,ew_cnt_01:0,
+   class_cnt_02:1,child_cnt_02:5,ew_cnt_02:0, class_cnt_03:0,child_cnt_03:0,ew_cnt_03:0,
+   class_cnt_04:0,child_cnt_04:0,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+
+ mk({crname:'중앙동어린이집',crtypename:'국공립',sidoname:'부산광역시',sigunguname:'중구',_emd:'중앙동',
+   craddr:'부산광역시 중구 중앙대로 81',crtelno:'051-244-1010',crcapat:42,crchcnt:31,em_cnt_a2:8,_red:[],
+   class_cnt_00:1,child_cnt_00:2,ew_cnt_00:0, class_cnt_01:1,child_cnt_01:4,ew_cnt_01:0,
+   class_cnt_02:1,child_cnt_02:6,ew_cnt_02:0, class_cnt_03:1,child_cnt_03:11,ew_cnt_03:0,
+   class_cnt_04:1,child_cnt_04:8,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'안산중앙어린이집',crtypename:'민간',sidoname:'경기도',sigunguname:'안산시 단원구',_emd:'중앙동',
+   craddr:'경기도 안산시 단원구 중앙대로 900',crtelno:'031-482-3131',crcapat:58,crchcnt:40,em_cnt_a2:11,_red:[],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:2, class_cnt_01:2,child_cnt_01:7,ew_cnt_01:0,
+   class_cnt_02:2,child_cnt_02:11,ew_cnt_02:1, class_cnt_03:1,child_cnt_03:12,ew_cnt_03:0,
+   class_cnt_04:1,child_cnt_04:9,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+
+ mk({crname:'봉평숲어린이집',crtypename:'국공립',sidoname:'강원특별자치도',sigunguname:'평창군',_emd:'봉평면',
+   craddr:'강원특별자치도 평창군 봉평면 태기로 12',crtelno:'033-336-4545',crcapat:30,crchcnt:14,em_cnt_a2:6,_red:[],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:0, class_cnt_01:1,child_cnt_01:2,ew_cnt_01:0,
+   class_cnt_02:1,child_cnt_02:4,ew_cnt_02:0, class_cnt_03:1,child_cnt_03:6,ew_cnt_03:0,
+   class_cnt_04:1,child_cnt_04:1,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0}),
+ mk({crname:'애월가정어린이집',crtypename:'가정',sidoname:'제주특별자치도',sigunguname:'제주시',_emd:'애월읍',
+   craddr:'제주특별자치도 제주시 애월읍 애월해안로 200',crtelno:'064-799-8080',crcapat:20,crchcnt:11,em_cnt_a2:4,_red:[],
+   class_cnt_00:1,child_cnt_00:1,ew_cnt_00:0, class_cnt_01:1,child_cnt_01:3,ew_cnt_01:0,
+   class_cnt_02:1,child_cnt_02:5,ew_cnt_02:0, class_cnt_03:0,child_cnt_03:0,ew_cnt_03:0,
+   class_cnt_04:0,child_cnt_04:0,ew_cnt_04:0, class_cnt_05:0,child_cnt_05:0,ew_cnt_05:0})
+];
+let DATA = SAMPLE;
+
+const SIDO = {'서울':'서울특별시','부산':'부산광역시','대구':'대구광역시','인천':'인천광역시','광주':'광주광역시',
+  '대전':'대전광역시','울산':'울산광역시','세종':'세종특별자치시','경기':'경기도','강원':'강원특별자치도',
+  '충북':'충청북도','충남':'충청남도','전북':'전북특별자치도','전남':'전라남도','경북':'경상북도',
+  '경남':'경상남도','제주':'제주특별자치도','충청북':'충청북도','충청남':'충청남도','전라북':'전북특별자치도',
+  '전라남':'전라남도','경상북':'경상북도','경상남':'경상남도'};
+
+/* 도로명 → 법정동. 실서비스에서는 juso.go.kr 주소 API가 이 표를 대신합니다. */
+const ROADS = {
+  '감일순환로':[{sgg:'하남시', emd:'감일동'}], '감일백제로':[{sgg:'하남시', emd:'감일동'}],
+  '감일중앙로':[{sgg:'하남시', emd:'감일동'}], '정릉로':[{sgg:'성북구', emd:'정릉동'}],
+  '보국문로':[{sgg:'성북구', emd:'정릉동'}], '솔샘로':[{sgg:'성북구', emd:'정릉동'}],
+  '아리랑로':[{sgg:'성북구', emd:'정릉동'}], '성미산로':[{sgg:'마포구', emd:'연남동'}],
+  '동교로':[{sgg:'마포구', emd:'연남동'}], '연희로':[{sgg:'마포구', emd:'연남동'}],
+  '중앙대로':[{sgg:'중구', emd:'중앙동'}, {sgg:'안산시 단원구', emd:'중앙동'}],
+  '태기로':[{sgg:'평창군', emd:'봉평면'}], '애월해안로':[{sgg:'제주시', emd:'애월읍'}]
+};
+
+function parseAddress(raw){
+  const s = raw.replace(/\s+/g,' ').trim();
+  let sido = null, sgg = null, emd = null, road = null, cands = [];
+  for(const k in SIDO){ if(s.startsWith(k)){ sido = SIDO[k]; break; } }
+  const sggM = s.match(/([가-힣]{1,9}(?:시|군|구))(?=\s|$)/g);
+  if(sggM){
+    const parts = sggM.filter(x => !/(특별시|광역시|자치시)$/.test(x));
+    if(parts.length) sgg = parts.join(' ');
+  }
+  const emdM = s.match(/(?:^|\s)([가-힣]{1,6}\d{0,2}(?:동|읍|면))(?=\s|$)/g);
+  if(emdM) emd = emdM[emdM.length-1].trim();
+  const roadM = s.match(/([가-힣]+\d{0,3}(?:번?길|로))(?=\s|$|\d)/g);
+  if(roadM){
+    for(let i = roadM.length - 1; i >= 0; i--){
+      const r = roadM[i].trim();
+      if(ROADS[r]){ road = r; cands = ROADS[r]; break; }
+      if(!road) road = r;
+    }
+  }
+  if(cands.length && sgg){
+    const f = cands.filter(c => c.sgg === sgg || sgg.includes(c.sgg));
+    if(f.length) cands = f;
+  }
+  if(!emd && cands.length === 1) emd = cands[0].emd;
+  return {sido, sgg, emd, road, cands};
+}
+
+function syncStamp(){
+  const now = new Date(), s = new Date(now);
+  s.setHours(7,0,0,0);
+  if(now < s) s.setDate(s.getDate()-1);
+  const p = n => String(n).padStart(2,'0');
+  return s.getFullYear()+'.'+p(s.getMonth()+1)+'.'+p(s.getDate())+' 07:00';
+}
+document.getElementById('lastSync').textContent = syncStamp();
+
+const sel = document.getElementById('birth');
+BIRTH_OPTIONS.forEach(o => {
+  const el = document.createElement('option');
+  el.value = o.a; el.textContent = o.label; sel.appendChild(el);
+});
+
+let age = null, loc = '', shown = [];
+const ageOut = document.getElementById('ageOut'),
+      locIn  = document.getElementById('loc'),
+      parsedBox = document.getElementById('parsed'),
+      goBtn  = document.getElementById('search');
+
+sel.addEventListener('change', () => {
+  if(sel.value === ''){ age = null; ageOut.classList.remove('on'); return sync(); }
+  age = +sel.value;
+  const legal = LEGAL[age], red = REDUCED[age];
+  ageOut.className = 'age-out on';
+  ageOut.innerHTML = '<b>' + AGE_LABEL[age] + '에 들어갑니다</b>' + (red
+    ? '이 반은 교사 1명이 아동 ' + red + '명을 보육하는 어린이집도 있지만 교사 1명이 아동 ' + legal +
+      '명까지 맡을 수 있어요. 반마다 ' + legal + '명이 다 차지 않았다면 자리가 남아 있는 것으로 표시됩니다.'
+    : '이 반은 교사 1명이 아동 ' + legal + '명까지 맡을 수 있어요. 반마다 ' + legal +
+      '명이 다 차지 않았다면 자리가 남아 있는 것으로 표시됩니다.');
+  sync();
+});
+
+locIn.addEventListener('input', () => {
+  loc = locIn.value.trim();
+  if(!loc){ parsedBox.className = 'parsed'; return sync(); }
+  const p = parseAddress(loc);
+  if(p.emd){
+    parsedBox.className = 'parsed on ok';
+    parsedBox.innerHTML = (p.road && ROADS[p.road] ? esc(p.road) + ' → ' : '') +
+      '<b>' + esc([p.sido,p.sgg,p.emd].filter(Boolean).join(' ')) + '</b> 으로 찾습니다';
+  } else if(p.cands.length > 1){
+    parsedBox.className = 'parsed on ok';
+    parsedBox.innerHTML = '<b>' + esc(p.road) + '</b> 은(는) 여러 지역에 있어요. 다음 화면에서 골라주세요.';
+  } else if(p.sgg){
+    parsedBox.className = 'parsed on warn';
+    parsedBox.innerHTML = '<b>' + esc([p.sido,p.sgg].filter(Boolean).join(' ')) + '</b> 전체에서 찾습니다. ' +
+      (p.road ? esc(p.road) + ' 은(는) 아직 등록되지 않은 도로명이라 시·군·구 기준으로 찾아요.'
+              : '도로명을 덧붙이면 더 가까운 곳만 볼 수 있어요.');
+  } else {
+    parsedBox.className = 'parsed on warn';
+    parsedBox.textContent = '시·군·구와 도로명이 보이지 않아요. 예) 경기도 하남시 감일순환로';
+  }
+  sync();
+});
+locIn.addEventListener('keydown', e => { if(e.key === 'Enter' && !goBtn.disabled) goBtn.click(); });
+function sync(){ goBtn.disabled = !(age !== null && loc.length > 0); }
+
+const pickerBox = document.getElementById('picker'),
+      resultBox = document.getElementById('results');
+
+goBtn.addEventListener('click', () => {
+  const p = parseAddress(loc);
+  pickerBox.className = ''; resultBox.className = '';
+  let hits = [], scope = '';
+  if(p.emd){ hits = DATA.filter(d => d._emd === p.emd); scope = p.emd; }
+  if(!hits.length && p.cands.length){
+    hits = DATA.filter(d => p.cands.some(c => c.emd === d._emd && c.sgg === d.sigunguname));
+    scope = p.cands[0].emd;
+  }
+  if(!hits.length && p.sgg){
+    hits = DATA.filter(d => d.sigunguname === p.sgg || d.sigunguname.includes(p.sgg) || p.sgg.includes(d.sigunguname));
+    scope = p.sgg + ' 전체';
+  }
+  if(!hits.length && p.sido){ hits = DATA.filter(d => d.sidoname === p.sido); scope = p.sido + ' 전체'; }
+
+  if(!hits.length){
+    resultBox.className = 'on';
+    resultBox.innerHTML = '<div class="empty"><b>' + esc(loc) + ' 에 아직 데이터가 없어요</b>' +
+      '운영계정 인증키를 연결하면 전국 어디든 조회할 수 있습니다. 지금은 하남시 감일동·감북동, ' +
+      '서울 성북구 정릉동, 마포구 연남동, 부산 중구·안산 단원구 중앙동, 평창군 봉평면, 제주시 애월읍만 들어 있습니다.</div>';
+    resultBox.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
+  const regions = [...new Set(hits.map(d => d.sidoname + '|' + d.sigunguname))];
+  if(regions.length > 1 && !p.sgg){
+    let h = '<p class="pick-head"><b>' + esc(scope) + '</b> 은(는) ' + regions.length + '곳에 있습니다. 어느 지역에 사시나요?</p>';
+    regions.forEach(r => {
+      const [sd, sg] = r.split('|');
+      const cnt = hits.filter(d => d.sidoname === sd && d.sigunguname === sg).length;
+      h += '<button class="pick" data-r="' + esc(r) + '"><span><span class="place">' + esc(sg) + ' ' + esc(scope) +
+        '</span><span class="up">' + esc(sd) + '</span></span><span class="cnt">어린이집 ' + cnt + '곳</span></button>';
+    });
+    pickerBox.className = 'on'; pickerBox.innerHTML = h;
+    pickerBox.querySelectorAll('.pick').forEach(b => b.addEventListener('click', () => {
+      const [sd, sg] = b.dataset.r.split('|');
+      render(hits.filter(d => d.sidoname === sd && d.sigunguname === sg), sd + ' ' + sg + ' ' + scope);
+    }));
+    pickerBox.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+  render(hits, [p.sido,p.sgg,p.emd].filter(Boolean).join(' ') || scope);
+});
+
+/* ── 판정 ── */
+function evaluate(d){
+  const k = '0' + age;
+  if(d.crcapat == null || d['class_cnt_' + k] == null) return {d, state:'wait'};
+
+  const rooms = d['class_cnt_' + k], kids = d['child_cnt_' + k], queue = d['ew_cnt_' + k] || 0;
+  if(rooms === 0) return {d, state:'none', queue};
+
+  const legalMax = rooms * LEGAL[age];
+  const free = Math.max(0, Math.min(legalMax - kids, d.crcapat - d.crchcnt));
+  const ratio = kids / rooms;
+  const lowRatio = (d._red || []).includes(age);
+
+  let state;
+  if(free > queue)      state = 'now';      // 대기자보다 자리가 많다 → 지금 가능성 높음
+  else if(free > 0)     state = 'queue';    // 자리는 있으나 대기자가 더 많다
+  else if(queue === 0)  state = 'empty0';   // 정원은 찼지만 줄 선 사람이 없다
+  else                  state = 'full';
+
+  return {d, state, rooms, kids, queue, legalMax, free, ratio, lowRatio};
+}
+
+const ORDER = {now:0, empty0:1, queue:2, full:3, none:4, wait:5};
+
+function render(list, label){
+  shown = list.map(evaluate).sort((a,b) =>
+    (ORDER[a.state] - ORDER[b.state]) || ((b.free||0) - (a.free||0)) || ((a.queue||0) - (b.queue||0)));
+
+  const nowCnt = shown.filter(x => x.state === 'now').length,
+        hasLive = shown.some(x => x.state !== 'wait'),
+        waitCnt = shown.filter(x => x.state === 'wait').length;
+
+  let h = '<div class="res-head"><h2>' + esc(label) + ' · ' + AGE_LABEL[age] + '</h2>';
+  h += hasLive
+    ? '<p class="lede">모두 ' + list.length + '곳 중 <span class="count">' + nowCnt +
+      '곳</span>이 대기자보다 자리가 많아 지금 들어갈 가능성이 있습니다.</p>'
+    : '<p class="lede">이 동네 어린이집 <span class="count">' + list.length + '곳</span>을 찾았습니다.</p>';
+  h += '<p class="stamp">' + syncStamp() + ' 기준 · 매일 오전 7시 갱신</p></div>';
+
+  if(waitCnt){
+    h += '<div class="notice"><b>이 지역은 정원·현원 데이터가 아직 연결되지 않았습니다.</b><br>' +
+      '이름·주소·전화번호는 실제 정보이며, ' + AGE_LABEL[age] +
+      ' 빈자리와 대기 인원은 운영계정 인증키 연결 후 표시됩니다.</div>';
+  }
+
+  const groups = [
+    ['now',    '지금 들어갈 가능성이 있는 곳'],
+    ['empty0', '자리는 찼지만 대기자가 없는 곳'],
+    ['queue',  '자리보다 대기자가 많은 곳'],
+    ['full',   '정원이 차고 대기자도 있는 곳'],
+    ['none',   AGE_LABEL[age] + '을 운영하지 않는 곳'],
+    ['wait',   '전화로 확인이 필요한 곳']
+  ];
+  groups.forEach(([st, title]) => {
+    const g = shown.filter(x => x.state === st);
+    if(!g.length) return;
+    h += '<div class="group-label">' + title + '</div>';
+    g.forEach(x => h += card(x, shown.indexOf(x)));
+  });
+
+  pickerBox.className = '';
+  resultBox.className = 'on';
+  resultBox.innerHTML = h;
+  resultBox.querySelectorAll('.homebtn').forEach(b =>
+    b.addEventListener('click', () => openSheet(+b.dataset.i)));
+  resultBox.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+const HOUSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.6V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.6"/><path d="M9.5 21v-6h5v6"/></svg>';
+
+function card(x, idx){
+  const d = x.d, tel = d.crtelno.replace(/-/g,'');
+  const BADGE = {
+    now   : '<span class="badge now">자리 ' + x.free + '명</span>',
+    empty0: '<span class="badge empty0">대기 없음</span>',
+    queue : '<span class="badge queue">자리 ' + x.free + ' · 대기 ' + x.queue + '</span>',
+    full  : '<span class="badge full">대기 ' + x.queue + '명</span>',
+    none  : '<span class="badge none">반 미운영</span>',
+    wait  : '<span class="badge wait">확인 필요</span>'
+  };
+  const FREE = {
+    now   : '<span class="v free">' + x.free + '자리 남음</span>',
+    empty0: '<span class="v full">남은 자리 없음</span>',
+    queue : '<span class="v free">' + x.free + '자리 남음</span>',
+    full  : '<span class="v full">남은 자리 없음</span>',
+    none  : '<span class="v">이 연령 반을 운영하지 않음</span>',
+    wait  : '<span class="v unknown">확인 필요 (데이터 미연결)</span>'
+  };
+  const QUEUE = x.state === 'wait' || x.state === 'none' ? ''
+    : '<div class="fact"><span class="k">대기</span>' +
+      (x.queue === 0 ? '<span class="v good">줄 선 아이 없음</span>'
+                     : '<span class="v full">' + x.queue + '명 대기 중</span>') + '</div>';
+
+  let seats = '';
+  if(x.state !== 'wait' && x.state !== 'none'){
+    let dots = '';
+    for(let i = 0; i < x.legalMax; i++) dots += '<div class="dot ' + (i < x.kids ? 'filled' : 'free') + '"></div>';
+    for(let i = 0; i < Math.min(x.queue, 12); i++) dots += '<div class="dot queue"></div>';
+    seats = '<div class="seats"><div class="seats-cap"><span>' + AGE_LABEL[age] + ' ' + x.rooms + '개 반</span>' +
+      '<span><b>' + x.kids + '명</b> / 최대 ' + x.legalMax + '명</span></div><div class="dots">' + dots + '</div>' +
+      '<div class="seats-note">초록은 다니는 아이, 점선은 빈자리, 연한 갈색은 대기 중인 아이입니다. ' +
+      '교사 1명당 ' + x.ratio.toFixed(1) + '명을 맡고 있어요.</div>' +
+      (x.lowRatio && REDUCED[age] ? '<span class="low-ratio">교사 1명당 ' + REDUCED[age] + '명으로 운영</span>' : '') +
+      '</div>';
+  }
+
+  return '<article class="cc' + (x.state === 'now' ? ' now' : '') + '">' +
+    '<div class="cc-top"><div><p class="cc-name">' + esc(d.crname) + '</p>' +
+      '<div class="cc-type">' + esc(d.crtypename) +
+      (d.crcapat != null ? ' · 정원 ' + d.crcapat + '명 · 현원 ' + d.crchcnt + '명' : '') + '</div></div>' +
+      BADGE[x.state] + '</div>' +
+    '<div class="facts">' +
+      '<div class="fact"><span class="k">연령</span><span class="v">' + AGE_LABEL[age] + '</span></div>' +
+      '<div class="fact"><span class="k">빈자리</span>' + FREE[x.state] + '</div>' + QUEUE +
+      '<div class="fact"><span class="k">전화</span><a href="tel:' + tel + '">' +
+        esc(d.crtelno) + '<span class="tag">누르면 전화</span></a></div>' +
+    '</div>' + seats +
+    '<div class="verify"><span class="mark">!</span><span>여기 표시된 빈자리는 공개 자료를 바탕으로 한 추정입니다. ' +
+      '실제 입소가 가능한지는 <b>어린이집에 꼭 전화로 확인</b>해 주세요. ' +
+      '자리가 비어 있어도 원의 사정에 따라 받지 않을 수 있습니다.</span></div>' +
+    '<button class="homebtn" data-i="' + idx + '" aria-label="' + esc(d.crname) + ' 정보 바로가기">' +
+      HOUSE + esc(d.crname) + ' 정보 바로가기</button>' +
+    '</article>';
+}
+
+/* ── 상세 패널 ── */
+const sheet = document.getElementById('sheet'), sheetBg = document.getElementById('sheetBg');
+
+function openSheet(i){
+  const x = shown[i], d = x.d, tel = d.crtelno.replace(/-/g,'');
+  let ages = '';
+  if(d.crcapat != null){
+    for(let a = 0; a <= 5; a++){
+      const k = '0' + a, rooms = d['class_cnt_' + k], kids = d['child_cnt_' + k], q = d['ew_cnt_' + k] || 0;
+      const max = rooms * LEGAL[a];
+      let val;
+      if(!rooms) val = '운영하지 않음';
+      else {
+        val = kids + '명 / 최대 ' + max + '명';
+        val += max - kids > 0 ? ' · <b>' + (max - kids) + '자리</b>' : ' · 정원 참';
+        if(q) val += ' <span class="q">· 대기 ' + q + '명</span>';
+      }
+      ages += '<div class="agerow' + (a === age ? ' me' : '') + '"><span class="lab">' + AGE_LABEL[a] +
+        '</span><span class="val">' + val + '</span></div>';
+    }
+  } else {
+    ages = '<p style="margin:0;font-size:13px;color:var(--ink-soft);line-height:1.6">' +
+      '연령별 반 현황과 대기 인원은 운영계정 인증키가 연결되면 표시됩니다. ' +
+      '지금은 임의의 숫자를 넣지 않고 비워 둡니다.</p>';
+  }
+
+  const mapQ = encodeURIComponent(d.crname + ' ' + d.craddr);
+  sheet.innerHTML = '<div class="sheet-grip"></div>' +
+    '<h3 id="sheetName">' + esc(d.crname) + '</h3>' +
+    '<p class="kind">' + esc(d.crtypename) + ' · ' + esc(d.sigunguname) + ' ' + esc(d._emd) +
+      (d.crcapat != null ? ' · 정원 ' + d.crcapat + '명 · 현원 ' + d.crchcnt + '명' : '') + '</p>' +
+    '<section><h4>연령별 반 현황과 대기 인원</h4>' + ages + '</section>' +
+    (d.em_cnt_a2 != null
+      ? '<section><h4>보육교사</h4><div class="line"><span class="k">교사 수</span><span>' +
+        d.em_cnt_a2 + '명 (원장·조리원 등 제외)</span></div></section>' : '') +
+    '<section><h4>연락처</h4>' +
+      '<div class="line"><span class="k">주소</span><span>' + esc(d.craddr) + '</span></div>' +
+      '<div class="line"><span class="k">전화</span><a href="tel:' + tel + '">' + esc(d.crtelno) + '</a></div>' +
+    '</section>' +
+    '<a class="outlink" href="https://map.naver.com/p/search/' + mapQ + '" target="_blank" rel="noopener">' +
+      '<span>지도에서 위치 보기<span class="ds">집에서 얼마나 걸리는지 확인해 보세요</span></span><span class="ar">↗</span></a>' +
+    '<a class="outlink" href="https://info.childcare.go.kr" target="_blank" rel="noopener">' +
+      '<span>정보공개포털에서 검색<span class="ds">평가등급 · 급식 · CCTV · 보육교직원 공시정보</span></span><span class="ar">↗</span></a>' +
+    '<a class="outlink" href="https://enter.childinfo.go.kr" target="_blank" rel="noopener">' +
+      '<span>유보통합포털에서 입소대기 신청<span class="ds">이 어린이집을 검색해 대기를 걸어두세요</span></span><span class="ar">↗</span></a>' +
+    '<div class="verify" style="margin-top:14px"><span class="mark">!</span><span>' +
+      '빈자리는 추정치입니다. 실제 입소 가능 여부는 <b>어린이집에 꼭 전화로 확인</b>해 주세요. ' +
+      '자리가 비어 있어도 원의 사정에 따라 받지 않을 수 있습니다.</span></div>' +
+    '<a class="callbtn" href="tel:' + tel + '">' + esc(d.crtelno) + ' 로 전화하기</a>' +
+    '<button class="closebtn" id="sheetClose">닫기</button>';
+
+  sheet.classList.add('on'); sheetBg.classList.add('on');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('sheetClose').addEventListener('click', closeSheet);
+}
+function closeSheet(){
+  sheet.classList.remove('on'); sheetBg.classList.remove('on');
+  document.body.style.overflow = '';
+}
+sheetBg.addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeSheet(); });
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* 서버 연동이 준비되면 실행 */
+if(API.useLive){
+  loadLive().then(rows => { DATA = rows; }).catch(e => console.warn('실데이터 로드 실패, 샘플로 동작합니다:', e));
+}
+</script>
