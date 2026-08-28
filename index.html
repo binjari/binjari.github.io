@@ -351,92 +351,95 @@ $('goBtn').addEventListener('click', async () => {
 
   const items = data.items || [];
   const anyAge = items.some(it => n(it['class_cnt_0' + ageIdx]) > 0);
+  const scope = picked.road || picked.emd || '';
 
-  const rows = items.map(it => {
+  const all = items.map(it => {
     const s = seatsOf(it, ageIdx);
     const addr = it.craddr || '';
-    const sameRoad = picked.road && addr.includes(picked.road);
-    const sameDong = picked.emd && addr.includes(picked.emd);
-    return { it, s, sameRoad, sameDong };
+    return { it, s, inScope: scope ? addr.includes(scope) : true };
   }).filter(r => anyAge ? r.s.classes > 0 : true);
 
-  rows.sort((a, b) =>
-    (b.sameRoad - a.sameRoad) || (b.sameDong - a.sameDong) ||
-    (b.s.open - a.s.open) || (a.s.wait - b.s.wait)
+  all.sort((a, b) =>
+    (b.inScope - a.inScope) || (b.s.open - a.s.open) || (a.s.wait - b.s.wait)
   );
 
-  render(rows, anyAge);
+  render(all, anyAge, scope);
 });
 
-function render(rows, anyAge){
+function render(rows, anyAge, scope){
   const area = $('listArea');
-  const openCount = rows.filter(r => r.s.open > 0).length;
+  const inScope = rows.filter(r => r.inScope);
+  const label = scope || picked.sgg;
 
-  if(!anyAge){
-    area.innerHTML = `
-      <div class="filter"><span class="count">${picked.sgg} 어린이집 ${rows.length}곳</span></div>
-      <div class="card empty" style="text-align:left">
-        이 지역은 연령별 반 정보가 제공되지 않아, 어린이집 전체 정원과 재원 인원만 보여드립니다.
-        ${AGE_LABEL[ageIdx]} 자리는 전화로 확인해 주세요.
-      </div>
-      <div id="places"></div>`;
-    $('places').innerHTML = rows.map(({it, s, sameRoad, sameDong}) => {
-      const cap = n(it.crcapat), kid = n(it.crchcnt), left = Math.max(0, cap - kid);
-      return `
+  const card = (r) => {
+    const {it, s} = r;
+    const cap = anyAge ? s.cap : n(it.crcapat);
+    const kid = anyAge ? s.kids : n(it.crchcnt);
+    const left = anyAge ? s.open : Math.max(0, cap - kid);
+    return `
       <article class="place">
-        <h3>${it.crname || '이름 없음'}${sameRoad ? ` · ${picked.road}` : (sameDong ? ` · ${picked.emd}` : '')}</h3>
+        <h3>${it.crname || '이름 없음'}</h3>
         <p class="addr">${it.craddr || ''}</p>
         <div class="seats ${left > 0 ? '' : 'none'}">
           <span class="big">${left > 0 ? left + '자리' : '자리 없음'}</span>
-          <span class="lab">전체 정원 ${cap}명 중 ${kid}명 재원</span>
+          <span class="lab">${anyAge ? AGE_LABEL[ageIdx] + ' · ' : '전체 '}정원 ${cap}명 중 ${kid}명 재원</span>
         </div>
         <div class="meta">
+          ${anyAge ? `<span>대기 ${s.wait}명</span><span>${AGE_LABEL[ageIdx]} ${s.classes}개 반</span>` : ''}
           ${it.crtelno ? `<a class="tel" href="tel:${it.crtelno.replace(/[^0-9]/g,'')}">전화 ${it.crtelno}</a>` : ''}
         </div>
       </article>`;
-    }).join('');
-    area.scrollIntoView({behavior:'smooth', block:'start'});
-    return;
-  }
-
-  area.innerHTML = `
-    <div class="filter">
-      <input type="checkbox" id="onlyOpen" checked>
-      <label for="onlyOpen" style="margin:0;font-weight:400">빈자리 있는 곳만 보기</label>
-      <span class="count">${AGE_LABEL[ageIdx]} · 빈자리 ${openCount}곳</span>
-    </div>
-    <div id="places"></div>`;
-
-  const draw = () => {
-    const only = $('onlyOpen').checked;
-    const list = only ? rows.filter(r => r.s.open > 0) : rows;
-    const box = $('places');
-
-    if(list.length === 0){
-      box.innerHTML = `<div class="card empty">
-        ${AGE_LABEL[ageIdx]} 빈자리가 있는 곳이 없어요.<br>
-        체크를 풀면 대기 인원이 적은 곳부터 볼 수 있습니다.</div>`;
-      return;
-    }
-
-    box.innerHTML = list.map(({it, s, sameRoad, sameDong}) => `
-      <article class="place">
-        <h3>${it.crname || '이름 없음'}${sameRoad ? ` · ${picked.road}` : (sameDong ? ` · ${picked.emd}` : '')}</h3>
-        <p class="addr">${it.craddr || ''}</p>
-        <div class="seats ${s.open > 0 ? '' : 'none'}">
-          <span class="big">${s.open > 0 ? s.open + '자리' : '자리 없음'}</span>
-          <span class="lab">${AGE_LABEL[ageIdx]} · 정원 ${s.cap}명 중 ${s.kids}명 재원</span>
-        </div>
-        <div class="meta">
-          <span>대기 ${s.wait}명</span>
-          <span>${AGE_LABEL[ageIdx]} ${s.classes}개 반</span>
-          ${it.crtelno ? `<a class="tel" href="tel:${it.crtelno.replace(/[^0-9]/g,'')}">전화 ${it.crtelno}</a>` : ''}
-        </div>
-      </article>`).join('');
   };
 
-  $('onlyOpen').addEventListener('change', draw);
-  draw();
+  // 검색한 동네에 어린이집이 아예 없을 때만 범위를 넓혀서 보여줌
+  if (inScope.length === 0) {
+    area.innerHTML = `
+      <div class="card empty" style="text-align:left">
+        <strong style="display:block;color:#17251f;margin-bottom:6px">${label}에는 등록된 어린이집이 없어요</strong>
+        대신 ${picked.sgg} 전체를 보여드립니다.
+      </div>
+      <div class="filter">
+        <input type="checkbox" id="onlyOpen" ${anyAge ? 'checked' : ''} ${anyAge ? '' : 'disabled'}>
+        <label for="onlyOpen" style="margin:0;font-weight:400">빈자리 있는 곳만 보기</label>
+        <span class="count" id="cnt"></span>
+      </div>
+      <div id="places"></div>`;
+    drawList(rows);
+  } else {
+    area.innerHTML = `
+      <div class="filter">
+        <input type="checkbox" id="onlyOpen" ${anyAge ? 'checked' : ''} ${anyAge ? '' : 'disabled'}>
+        <label for="onlyOpen" style="margin:0;font-weight:400">빈자리 있는 곳만 보기</label>
+        <span class="count" id="cnt"></span>
+      </div>
+      <div id="places"></div>`;
+    drawList(inScope);
+  }
+
+  function drawList(source){
+    const draw = () => {
+      const only = anyAge && $('onlyOpen').checked;
+      const list = only ? source.filter(r => r.s.open > 0) : source;
+      $('cnt').textContent = `${label} · ${list.length}곳`;
+
+      if (list.length === 0) {
+        $('places').innerHTML = `<div class="card empty">
+          ${AGE_LABEL[ageIdx]} 빈자리가 있는 곳이 없어요.<br>
+          체크를 풀면 대기 인원이 적은 곳부터 볼 수 있습니다.</div>`;
+        return;
+      }
+      $('places').innerHTML = list.map(card).join('');
+    };
+    $('onlyOpen').addEventListener('change', draw);
+    draw();
+  }
+
+  if (!anyAge) {
+    area.insertAdjacentHTML('afterbegin', `<div class="card empty" style="text-align:left">
+      이 지역은 연령별 반 정보가 제공되지 않아, 전체 정원과 재원 인원만 보여드립니다.
+      ${AGE_LABEL[ageIdx]} 자리는 전화로 확인해 주세요.</div>`);
+  }
+
   area.scrollIntoView({behavior:'smooth', block:'start'});
 }
 </script>
