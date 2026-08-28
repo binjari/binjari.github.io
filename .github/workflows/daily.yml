@@ -1,10 +1,14 @@
-name: 매일 오전 7시 어린이집 데이터 수집
+name: 어린이집 데이터 수집
 
 on:
   schedule:
-    # GitHub는 UTC 기준으로 돕니다. 한국 오전 7시 = UTC 22시 (전날)
-    - cron: '0 22 * * *'
-  workflow_dispatch:        # 버튼을 눌러 바로 돌려볼 수도 있습니다
+    - cron: '0 22 * * *'      # UTC 22:00 = 한국시간 오전 7시
+  workflow_dispatch:           # Actions 탭에서 수동 실행
+    inputs:
+      only:
+        description: '일부 시군구만 수집 (쉼표로 구분, 예: 41450,44133). 비워두면 전국'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -12,6 +16,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
+
     steps:
       - name: 저장소 내려받기
         uses: actions/checkout@v4
@@ -21,19 +26,31 @@ jobs:
         with:
           node-version: '20'
 
-      - name: 데이터 수집
+      - name: 시군구 목록 만들기
+        run: |
+          if [ -f regions.json ]; then
+            echo "regions.json 이미 있음 — 건너뜀"
+          elif [ -f bjd.txt ]; then
+            node make-regions.js
+          else
+            echo "::error::bjd.txt 도 regions.json 도 없습니다. code.go.kr에서 법정동코드 전체자료를 받아 bjd.txt 로 올려주세요."
+            exit 1
+          fi
+
+      - name: 어린이집 데이터 수집
         env:
           CHILDCARE_KEY: ${{ secrets.CHILDCARE_KEY }}
+          ONLY: ${{ github.event.inputs.only }}
         run: node collect.js
 
-      - name: 바뀐 내용 저장
+      - name: 결과 저장
         run: |
-          git config user.name  "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add data/
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data regions.json
           if git diff --staged --quiet; then
-            echo "바뀐 내용이 없습니다"
+            echo "변경 없음"
           else
-            git commit -m "데이터 갱신 $(date -u +'%Y-%m-%d')"
+            git commit -m "데이터 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
             git push
           fi
