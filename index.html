@@ -319,10 +319,21 @@ function updateBtn(){ $('goBtn').disabled = !(picked && ageIdx !== null); }
 // ── 어린이집 조회 ──────────────────────────────────────
 const n = v => { const x = parseInt(v, 10); return isNaN(x) ? 0 : x; };
 
+// 항목 이름의 대소문자가 API마다 달라서, 가리지 않고 찾습니다.
+function pick(item, name){
+  if (item[name] !== undefined) return item[name];
+  const up = name.toUpperCase(), low = name.toLowerCase();
+  if (item[up] !== undefined) return item[up];
+  if (item[low] !== undefined) return item[low];
+  for (const k in item) if (k.toLowerCase() === low) return item[k];
+  return undefined;
+}
+
 function seatsOf(item, idx){
-  const classes = n(item['class_cnt_0' + idx]);
-  const kids    = n(item['child_cnt_0' + idx]);
-  const wait    = n(item['ew_cnt_0' + idx]);
+  const two = String(idx).padStart(2, '0');
+  const classes = n(pick(item, 'class_cnt_' + two));
+  const kids    = n(pick(item, 'child_cnt_' + two));
+  const wait    = n(pick(item, 'ew_cnt_' + two));
   const cap     = classes * CLASS_LIMIT[idx];
   return { classes, kids, wait, cap, open: Math.max(0, cap - kids) };
 }
@@ -350,12 +361,12 @@ $('goBtn').addEventListener('click', async () => {
   }
 
   const items = data.items || [];
-  const anyAge = items.some(it => n(it['class_cnt_0' + ageIdx]) > 0);
+  const anyAge = items.some(it => n(pick(it, 'class_cnt_0' + ageIdx)) > 0);
   const scope = picked.road || picked.emd || '';
 
   const all = items.map(it => {
     const s = seatsOf(it, ageIdx);
-    const addr = it.craddr || '';
+    const addr = pick(it,'craddr') || '';
     return { it, s, inScope: scope ? addr.includes(scope) : true };
   }).filter(r => anyAge ? r.s.classes > 0 : true);
 
@@ -373,20 +384,20 @@ function render(rows, anyAge, scope){
 
   const card = (r) => {
     const {it, s} = r;
-    const cap = anyAge ? s.cap : n(it.crcapat);
-    const kid = anyAge ? s.kids : n(it.crchcnt);
+    const cap = anyAge ? s.cap : n(pick(it, 'crcapat'));
+    const kid = anyAge ? s.kids : n(pick(it, 'crchcnt'));
     const left = anyAge ? s.open : Math.max(0, cap - kid);
     return `
       <article class="place">
-        <h3>${it.crname || '이름 없음'}</h3>
-        <p class="addr">${it.craddr || ''}</p>
+        <h3>${pick(it,'crname') || '이름 없음'}</h3>
+        <p class="addr">${pick(it,'craddr') || ''}</p>
         <div class="seats ${left > 0 ? '' : 'none'}">
           <span class="big">${left > 0 ? left + '자리' : '자리 없음'}</span>
           <span class="lab">${anyAge ? AGE_LABEL[ageIdx] + ' · ' : '전체 '}정원 ${cap}명 중 ${kid}명 재원</span>
         </div>
         <div class="meta">
           ${anyAge ? `<span>대기 ${s.wait}명</span><span>${AGE_LABEL[ageIdx]} ${s.classes}개 반</span>` : ''}
-          ${it.crtelno ? `<a class="tel" href="tel:${it.crtelno.replace(/[^0-9]/g,'')}">전화 ${it.crtelno}</a>` : ''}
+          ${(() => { const t = pick(it,'crtelno'); return t ? `<a class="tel" href="tel:${String(t).replace(/[^0-9]/g,'')}">전화 ${t}</a>` : ''; })()}
         </div>
       </article>`;
   };
