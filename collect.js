@@ -22,14 +22,8 @@ const GAP_MS = 300;         // 호출 간격
 const RETRY = 2;            // 실패 시 재시도 횟수
 const TIMEOUT_MS = 20000;
 
-// 저장할 필드 (파일 크기를 줄이려고 필요한 것만 추림)
-const KEEP = [
-  'stcode', 'crname', 'craddr', 'crtelno', 'la', 'lo',
-  'crcapat', 'crchcnt', 'em_cnt_a2', 'datastdrdt',
-  'class_cnt_00', 'class_cnt_01', 'class_cnt_02', 'class_cnt_03', 'class_cnt_04', 'class_cnt_05',
-  'child_cnt_00', 'child_cnt_01', 'child_cnt_02', 'child_cnt_03', 'child_cnt_04', 'child_cnt_05',
-  'ew_cnt_00', 'ew_cnt_01', 'ew_cnt_02', 'ew_cnt_03', 'ew_cnt_04', 'ew_cnt_05',
-];
+// 응답에 들어 있는 항목은 이름을 가리지 않고 모두 저장합니다.
+// (항목 이름을 미리 정해두면, API가 조금만 달라져도 값이 통째로 사라집니다)
 
 // ── 인증키 ─────────────────────────────────────────────
 const KEY = process.env.CHILDCARE_KEY;
@@ -84,8 +78,8 @@ function parseItems(xml) {
 
 function slim(obj) {
   const out = {};
-  for (const k of KEEP) {
-    if (obj[k] !== undefined && obj[k] !== '') out[k] = obj[k];
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') out[k] = v;
   }
   return out;
 }
