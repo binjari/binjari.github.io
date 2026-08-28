@@ -140,10 +140,10 @@
 
   <section class="card">
     <div class="step"><span class="num">2</span><h2>어린이집을 찾을 동네</h2></div>
-    <p class="hint">도로명이나 동 이름을 넣고 검색하세요. 건물번호까지 없어도 됩니다.</p>
+    <p class="hint">도로명이나 동 이름 중 편한 쪽으로 넣으세요. 건물번호는 없어도 됩니다.</p>
     <label for="addr">우리 집 주소</label>
     <div class="row">
-      <input type="text" id="addr" placeholder="예) 하남시 감일순환로" autocomplete="street-address">
+      <input type="text" id="addr" placeholder="예) 감일순환로 또는 감일동" autocomplete="street-address">
       <button class="btn-sm" id="addrBtn">검색</button>
     </div>
     <div id="addrResults"></div>
@@ -268,12 +268,31 @@ async function doAddrSearch(){
       msg.className = 'msg err'; return;
     }
     msg.textContent = '';
+
+    // 도로명으로 찾았는지, 동 이름으로 찾았는지 판단해서 그 단위로 묶음
+    const groups = new Map();
+    list.forEach(j => {
+      const byRoad = j.rn && kw.includes(j.rn);
+      const road = byRoad ? j.rn : '';
+      const key = String(j.admCd).slice(0, 5) + '|' + (road || j.emdNm || '');
+      if (!groups.has(key)) {
+        groups.set(key, {
+          arcode: String(j.admCd).slice(0, 5),
+          sido: j.siNm, sgg: j.sggNm, emd: j.emdNm, road,
+        });
+      }
+    });
+    const found = [...groups.values()];
+
+    // 한 군데로 좁혀지면 바로 선택
+    if (found.length === 1) { selectPlace(found[0]); return; }
+
     const wrap = document.createElement('div');
     wrap.className = 'results';
-    list.forEach(j => {
+    found.forEach(g => {
       const b = document.createElement('button');
-      b.innerHTML = `${j.roadAddr}<span class="jibun">${j.jibunAddr || ''}</span>`;
-      b.onclick = () => selectAddr(j);
+      b.innerHTML = `${g.sido} ${g.sgg} ${g.road || g.emd}<span class="jibun">${g.road ? g.emd : ''}</span>`;
+      b.onclick = () => selectPlace(g);
       wrap.appendChild(b);
     });
     box.appendChild(wrap);
@@ -283,16 +302,12 @@ async function doAddrSearch(){
   }
 }
 
-function selectAddr(j){
-  picked = {
-    arcode: String(j.admCd).slice(0, 5),
-    sido: j.siNm, sgg: j.sggNm, emd: j.emdNm,
-    roadAddr: j.roadAddr
-  };
+function selectPlace(g){
+  picked = g;
   $('addrResults').innerHTML = '';
   const p = $('picked');
   p.className = 'picked';
-  p.innerHTML = `<strong>${picked.sido} ${picked.sgg}</strong>${picked.roadAddr}`;
+  p.innerHTML = `<strong>${picked.sido} ${picked.sgg}</strong>${picked.road || picked.emd} 주변에서 찾습니다`;
   updateBtn();
 }
 
@@ -334,22 +349,55 @@ $('goBtn').addEventListener('click', async () => {
       new Date(data.updated).toLocaleDateString('ko-KR');
   }
 
-  const rows = (data.items || []).map(it => {
+  const items = data.items || [];
+  const anyAge = items.some(it => n(it['class_cnt_0' + ageIdx]) > 0);
+
+  const rows = items.map(it => {
     const s = seatsOf(it, ageIdx);
-    const sameDong = picked.emd && (it.craddr || '').includes(picked.emd);
-    return { it, s, sameDong };
-  }).filter(r => r.s.classes > 0);
+    const addr = it.craddr || '';
+    const sameRoad = picked.road && addr.includes(picked.road);
+    const sameDong = picked.emd && addr.includes(picked.emd);
+    return { it, s, sameRoad, sameDong };
+  }).filter(r => anyAge ? r.s.classes > 0 : true);
 
   rows.sort((a, b) =>
-    (b.sameDong - a.sameDong) || (b.s.open - a.s.open) || (a.s.wait - b.s.wait)
+    (b.sameRoad - a.sameRoad) || (b.sameDong - a.sameDong) ||
+    (b.s.open - a.s.open) || (a.s.wait - b.s.wait)
   );
 
-  render(rows);
+  render(rows, anyAge);
 });
 
-function render(rows){
+function render(rows, anyAge){
   const area = $('listArea');
   const openCount = rows.filter(r => r.s.open > 0).length;
+
+  if(!anyAge){
+    area.innerHTML = `
+      <div class="filter"><span class="count">${picked.sgg} 어린이집 ${rows.length}곳</span></div>
+      <div class="card empty" style="text-align:left">
+        이 지역은 연령별 반 정보가 제공되지 않아, 어린이집 전체 정원과 재원 인원만 보여드립니다.
+        ${AGE_LABEL[ageIdx]} 자리는 전화로 확인해 주세요.
+      </div>
+      <div id="places"></div>`;
+    $('places').innerHTML = rows.map(({it, s, sameRoad, sameDong}) => {
+      const cap = n(it.crcapat), kid = n(it.crchcnt), left = Math.max(0, cap - kid);
+      return `
+      <article class="place">
+        <h3>${it.crname || '이름 없음'}${sameRoad ? ` · ${picked.road}` : (sameDong ? ` · ${picked.emd}` : '')}</h3>
+        <p class="addr">${it.craddr || ''}</p>
+        <div class="seats ${left > 0 ? '' : 'none'}">
+          <span class="big">${left > 0 ? left + '자리' : '자리 없음'}</span>
+          <span class="lab">전체 정원 ${cap}명 중 ${kid}명 재원</span>
+        </div>
+        <div class="meta">
+          ${it.crtelno ? `<a class="tel" href="tel:${it.crtelno.replace(/[^0-9]/g,'')}">전화 ${it.crtelno}</a>` : ''}
+        </div>
+      </article>`;
+    }).join('');
+    area.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
 
   area.innerHTML = `
     <div class="filter">
@@ -371,9 +419,9 @@ function render(rows){
       return;
     }
 
-    box.innerHTML = list.map(({it, s, sameDong}) => `
+    box.innerHTML = list.map(({it, s, sameRoad, sameDong}) => `
       <article class="place">
-        <h3>${it.crname || '이름 없음'}${sameDong ? ' · 우리 동네' : ''}</h3>
+        <h3>${it.crname || '이름 없음'}${sameRoad ? ` · ${picked.road}` : (sameDong ? ` · ${picked.emd}` : '')}</h3>
         <p class="addr">${it.craddr || ''}</p>
         <div class="seats ${s.open > 0 ? '' : 'none'}">
           <span class="big">${s.open > 0 ? s.open + '자리' : '자리 없음'}</span>
