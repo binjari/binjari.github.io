@@ -264,7 +264,7 @@ async function doAddrSearch(){
     }
     const list = data.results.juso || [];
     if(list.length === 0){
-      msg.textContent = '결과가 없어요. 동 이름이나 도로명으로 다시 검색해 보세요.';
+      msg.textContent = `'${kw}'로는 주소를 찾지 못했어요. 도로명(감일순환로)이나 동 이름(감일동)으로 다시 넣어보세요.`;
       msg.className = 'msg err'; return;
     }
     msg.textContent = '';
@@ -342,12 +342,19 @@ $('goBtn').addEventListener('click', async () => {
   const area = $('listArea');
   area.innerHTML = '<div class="empty">어린이집 정보를 불러오는 중…</div>';
 
-  let data;
-  try{
-    const res = await fetch(DATA_PATH + picked.arcode + '.json', {cache:'no-cache'});
-    if(!res.ok) throw new Error('no file');
-    data = await res.json();
-  }catch(e){
+  // 행정구(예: 천안시 서북구)는 시 단위로만 자료가 있는 경우가 있어 둘 다 시도합니다.
+  const codes = [picked.arcode];
+  const cityCode = picked.arcode.slice(0, 4) + '0';
+  if (cityCode !== picked.arcode) codes.push(cityCode);
+
+  let data = null;
+  for (const c of codes) {
+    try {
+      const res = await fetch(DATA_PATH + c + '.json', {cache:'no-cache'});
+      if (res.ok) { data = await res.json(); break; }
+    } catch (e) { /* 다음 코드로 */ }
+  }
+  if (!data) {
     area.innerHTML = `<div class="card empty">
       <strong style="display:block;color:#17251f;margin-bottom:6px">${picked.sgg} 자료는 아직 준비 중이에요</strong>
       다른 동네를 검색해 보시거나, 아래 유보통합포털에서 직접 찾아보실 수 있어요.
@@ -364,10 +371,19 @@ $('goBtn').addEventListener('click', async () => {
   const anyAge = items.some(it => n(pick(it, 'class_cnt_0' + ageIdx)) > 0);
   const scope = picked.road || picked.emd || '';
 
+  // 어린이집 주소는 도로명이라 '감일동'이 안 들어 있는 경우가 많습니다.
+  // 그래서 뒤에 붙는 동/읍/면/로/길을 떼고 핵심 글자로 비교합니다. (감일동 → 감일)
+  const core = scope.replace(/(동|읍|면|리|가|로|길)$/, '').replace(/\s/g, '');
+  const hit = addr => {
+    if (!scope) return true;
+    const a = addr.replace(/\s/g, '');
+    return a.includes(scope) || (core.length >= 2 && a.includes(core));
+  };
+
   const all = items.map(it => {
     const s = seatsOf(it, ageIdx);
     const addr = pick(it,'craddr') || '';
-    return { it, s, inScope: scope ? addr.includes(scope) : true };
+    return { it, s, inScope: hit(addr) };
   }).filter(r => anyAge ? r.s.classes > 0 : true);
 
   all.sort((a, b) =>
