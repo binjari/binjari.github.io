@@ -176,9 +176,16 @@
 const JUSO_KEY = 'U01TX0FVVEgyMDI2MDgyODE1MjYyODEyMDE1OTE=';   // 도로명주소 검색 API 승인키
 const DATA_PATH = './data/';                                    // 시군구별 데이터 폴더
 
-// 연령별 반 정원 상한 (만 0세 ~ 만 5세)
+// 연령별 반 정원 상한 (교사 대 아동 비율)
 const CLASS_LIMIT = [3, 5, 7, 15, 20, 20];
 const AGE_LABEL = ['만 0세반', '만 1세반', '만 2세반', '만 3세반', '만 4세반', '만 5세반'];
+
+// 혼합반. 정원은 낮은 연령 기준을 따릅니다.
+const MIXED = {
+  m2: { label: '영아혼합(0~2세)', limit: 3,  ages: [0, 1, 2] },
+  m3: { label: '영유아혼합(2~3세)', limit: 7,  ages: [2, 3] },
+  m5: { label: '유아혼합(3~5세)', limit: 15, ages: [3, 4, 5] },
+};
 
 // ── 상태 ──────────────────────────────────────────────
 let picked = null;      // {arcode, sido, sgg, emd, roadAddr}
@@ -331,11 +338,30 @@ function pick(item, name){
 
 function seatsOf(item, idx){
   const two = String(idx).padStart(2, '0');
+
   const classes = n(pick(item, 'class_cnt_' + two));
   const kids    = n(pick(item, 'child_cnt_' + two));
-  const wait    = n(pick(item, 'ew_cnt_' + two));
   const cap     = classes * CLASS_LIMIT[idx];
-  return { classes, kids, wait, cap, open: Math.max(0, cap - kids) };
+  const wait    = n(pick(item, 'ew_cnt_' + two));
+
+  // 이 나이가 들어갈 수 있는 혼합반도 함께 셉니다.
+  const mixed = [];
+  for (const [key, m] of Object.entries(MIXED)) {
+    if (!m.ages.includes(idx)) continue;
+    const mc = n(pick(item, 'class_cnt_' + key));
+    if (mc === 0) continue;
+    const mk = n(pick(item, 'child_cnt_' + key));
+    const mcap = mc * m.limit;
+    mixed.push({ label: m.label, classes: mc, kids: mk, cap: mcap, open: Math.max(0, mcap - mk) });
+  }
+
+  const mixedOpen = mixed.reduce((t, m) => t + m.open, 0);
+  const hasClass = classes > 0 || mixed.length > 0;
+
+  return {
+    classes, kids, cap, wait, mixed, mixedOpen, hasClass,
+    open: Math.max(0, cap - kids) + mixedOpen,
+  };
 }
 
 $('goBtn').addEventListener('click', async () => {
@@ -367,8 +393,12 @@ $('goBtn').addEventListener('click', async () => {
       new Date(data.updated).toLocaleDateString('ko-KR');
   }
 
-  const items = data.items || [];
-  const anyAge = items.some(it => n(pick(it, 'class_cnt_0' + ageIdx)) > 0);
+  const raw = data.items || [];
+  const items = raw.filter(it => {
+    const st = pick(it, 'crstatusname') || '';
+    return !st.includes('폐지') && !st.includes('휴지');   // 문 닫은 곳은 뺍니다
+  });
+  const anyAge = items.some(it => seatsOf(it, ageIdx).hasClass);
   const scope = picked.road || picked.emd || '';
 
   // 어린이집 주소는 도로명이라 '감일동'이 안 들어 있는 경우가 많습니다.
@@ -384,7 +414,7 @@ $('goBtn').addEventListener('click', async () => {
     const s = seatsOf(it, ageIdx);
     const addr = pick(it,'craddr') || '';
     return { it, s, inScope: hit(addr) };
-  }).filter(r => anyAge ? r.s.classes > 0 : true);
+  }).filter(r => anyAge ? r.s.hasClass : true);
 
   all.sort((a, b) =>
     (b.inScope - a.inScope) || (b.s.open - a.s.open) || (a.s.wait - b.s.wait)
@@ -400,23 +430,47 @@ function render(rows, anyAge, scope){
 
   const card = (r) => {
     const {it, s} = r;
-    const cap = anyAge ? s.cap : n(pick(it, 'crcapat'));
-    const kid = anyAge ? s.kids : n(pick(it, 'crchcnt'));
-    const left = anyAge ? s.open : Math.max(0, cap - kid);
-    return `
+
+    if (!anyAge) {
+      const cap = n(pick(it, 'crcapat')), kid = n(pick(it, 'crchcnt'));
+      const left = Math.max(0, cap - kid);
+      return `
       <article class="place">
         <h3>${pick(it,'crname') || '이름 없음'}</h3>
         <p class="addr">${pick(it,'craddr') || ''}</p>
         <div class="seats ${left > 0 ? '' : 'none'}">
           <span class="big">${left > 0 ? left + '자리' : '자리 없음'}</span>
-          <span class="lab">${anyAge ? AGE_LABEL[ageIdx] + ' · ' : '전체 '}정원 ${cap}명 중 ${kid}명 재원</span>
+          <span class="lab">전체 정원 ${cap}명 중 ${kid}명 재원</span>
+        </div>
+        <div class="meta">${telLink(it)}</div>
+      </article>`;
+    }
+
+    const own = Math.max(0, s.cap - s.kids);
+    const detail = [];
+    if (s.classes > 0) detail.push(`${AGE_LABEL[ageIdx]} ${s.classes}개 반 · 정원 ${s.cap}명 중 ${s.kids}명`);
+    s.mixed.forEach(m => detail.push(`${m.label} ${m.classes}개 반 · 정원 ${m.cap}명 중 ${m.kids}명`));
+
+    return `
+      <article class="place">
+        <h3>${pick(it,'crname') || '이름 없음'}</h3>
+        <p class="addr">${pick(it,'craddr') || ''}</p>
+        <div class="seats ${s.open > 0 ? '' : 'none'}">
+          <span class="big">${s.open > 0 ? s.open + '자리' : '자리 없음'}</span>
+          <span class="lab">${s.mixedOpen > 0 && own > 0 ? `전용반 ${own} · 혼합반 ${s.mixedOpen}` : (s.classes === 0 ? '혼합반만 운영' : '')}</span>
         </div>
         <div class="meta">
-          ${anyAge ? `<span>대기 ${s.wait}명</span><span>${AGE_LABEL[ageIdx]} ${s.classes}개 반</span>` : ''}
-          ${(() => { const t = pick(it,'crtelno'); return t ? `<a class="tel" href="tel:${String(t).replace(/[^0-9]/g,'')}">전화 ${t}</a>` : ''; })()}
+          <span>대기 ${s.wait}명</span>
+          ${telLink(it)}
         </div>
+        <p class="addr" style="margin:9px 0 0">${detail.join('<br>')}</p>
       </article>`;
   };
+
+  function telLink(it){
+    const t = pick(it, 'crtelno');
+    return t ? `<a class="tel" href="tel:${String(t).replace(/[^0-9]/g,'')}">전화 ${t}</a>` : '';
+  }
 
   // 검색한 동네에 어린이집이 아예 없을 때만 범위를 넓혀서 보여줌
   if (inScope.length === 0) {
