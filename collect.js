@@ -1,157 +1,214 @@
 /**
- * 우리동네 빈자리 어린이집 찾기 — 매일 오전 7시 데이터 수집
+ * 우리동네 빈자리 어린이집 찾기 - 데이터 수집
+ * 어린이집정보공개포털 cpmsapi030 (어린이집별 기본정보 조회)
  *
- * 어린이집정보공개포털 OPEN API (cpmsapi030) 를 시군구별로 호출해
- * data/childcare.json 파일을 새로 씁니다.
+ * 실행:  CHILDCARE_KEY=인증키 node collect.js
+ * 일부만:  CHILDCARE_KEY=인증키 ONLY=41450,11710 node collect.js
  *
- * 인증키는 이 파일에 적지 않습니다. 환경변수 CHILDCARE_KEY 로 받습니다.
- *   로컬 실행:  CHILDCARE_KEY=발급받은키 node collect.js
- *   GitHub:    저장소 Settings → Secrets → CHILDCARE_KEY 에 저장
- *
- * Node 18 이상이면 별도 설치 없이 그대로 돌아갑니다.
+ * 결과:  data/41450.json  (시군구별)
+ *        data/index.json  (수집된 시군구 목록)
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const KEY = process.env.CHILDCARE_KEY;
-const API = 'http://api.childcare.go.kr/mediate/rest/cpmsapi030/cpmsapi030/request';
+// ── 설정 ───────────────────────────────────────────────
+const API_URL = 'http://api.childcare.go.kr/mediate/rest/cpmsapi030/cpmsapi030/request';
+const DATA_DIR = path.join(__dirname, 'data');
+const REGIONS_FILE = path.join(__dirname, 'regions.json');
 
-/* ─────────────────────────────────────────────────────────────
-   수집할 시군구.  arcode 는 행정표준코드(5자리)입니다.
-   행정표준코드관리시스템(www.code.go.kr)에서 확인할 수 있고,
-   아래 값은 반드시 첫 실행 때 결과를 눈으로 확인해 주세요.
-   지역을 넓히려면 이 목록에 줄을 추가하기만 하면 됩니다.
-   ───────────────────────────────────────────────────────────── */
-const REGIONS = [
-  { arcode: '41450', name: '경기도 하남시' },
-  { arcode: '11290', name: '서울특별시 성북구' },
-  { arcode: '11440', name: '서울특별시 마포구' }
+const CONCURRENCY = 3;      // 동시 호출 수
+const GAP_MS = 300;         // 호출 간격
+const RETRY = 2;            // 실패 시 재시도 횟수
+const TIMEOUT_MS = 20000;
+
+// 저장할 필드 (파일 크기를 줄이려고 필요한 것만 추림)
+const KEEP = [
+  'stcode', 'crname', 'craddr', 'crtelno', 'la', 'lo',
+  'crcapat', 'crchcnt', 'em_cnt_a2', 'datastdrdt',
+  'class_cnt_00', 'class_cnt_01', 'class_cnt_02', 'class_cnt_03', 'class_cnt_04', 'class_cnt_05',
+  'child_cnt_00', 'child_cnt_01', 'child_cnt_02', 'child_cnt_03', 'child_cnt_04', 'child_cnt_05',
+  'ew_cnt_00', 'ew_cnt_01', 'ew_cnt_02', 'ew_cnt_03', 'ew_cnt_04', 'ew_cnt_05',
 ];
 
-const DELAY_MS = 1500;          // 호출 간격 (트래픽 한도 보호)
-const RETRY    = 3;             // 실패 시 재시도 횟수
-
-/* ── 응답 XML에서 항목 뽑기 (외부 라이브러리 없이) ── */
-function parseItems(xml) {
-  const items = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
-  return items.map(block => {
-    const get = tag => {
-      const m = block.match(new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'i'));
-      return m ? m[1].trim() : '';
-    };
-    const num = tag => {
-      const v = parseInt(get(tag), 10);
-      return Number.isNaN(v) ? null : v;
-    };
-
-    const rec = {
-      stcode      : get('stcode'),
-      crname      : get('crname'),
-      crtypename  : get('crtypename'),
-      crstatusname: get('crstatusname'),
-      sidoname    : get('sidoname'),
-      sigunguname : get('sigunguname'),
-      craddr      : get('craddr'),
-      crtelno     : get('crtelno'),
-      crcapat     : num('crcapat'),      // 정원
-      crchcnt     : num('crchcnt'),      // 현원
-      em_cnt_a2   : num('em_cnt_a2'),    // 보육교사 수
-      la          : get('la'),
-      lo          : get('lo'),
-      datastdrdt  : get('datastdrdt')
-    };
-
-    for (let a = 0; a <= 5; a++) {
-      const k = '0' + a;
-      rec['class_cnt_' + k] = num('class_cnt_' + k);   // 반 수
-      rec['child_cnt_' + k] = num('child_cnt_' + k);   // 아동 수
-      rec['ew_cnt_' + k]    = num('ew_cnt_' + k);      // 입소대기 아동 수
-    }
-
-    rec._emd = extractEmd(rec.craddr);
-    return rec;
-  });
+// ── 인증키 ─────────────────────────────────────────────
+const KEY = process.env.CHILDCARE_KEY;
+if (!KEY) {
+  console.error('CHILDCARE_KEY 환경변수가 없습니다. 수집을 중단합니다.');
+  process.exit(1);
 }
 
-/* 주소에서 동·읍·면 뽑기. 도로명주소에는 동이 없어 빈 값이 될 수 있습니다.
-   그 경우 앱은 시군구 단위로 보여주며, juso.go.kr 연동 시 정확해집니다. */
-function extractEmd(addr) {
-  const m = (addr || '').match(/(?:^|\s)([가-힣]{1,6}\d{0,2}(?:동|읍|면))(?=\s|$)/g);
-  return m ? m[m.length - 1].trim() : '';
+// ── 시군구 목록 ─────────────────────────────────────────
+function loadRegions() {
+  if (!fs.existsSync(REGIONS_FILE)) {
+    console.error('regions.json 이 없습니다. make-regions.js 를 먼저 실행하세요.');
+    process.exit(1);
+  }
+  let list = JSON.parse(fs.readFileSync(REGIONS_FILE, 'utf8'));
+
+  const only = process.env.ONLY;
+  if (only) {
+    const set = new Set(only.split(',').map(s => s.trim()));
+    list = list.filter(r => set.has(r.code));
+    console.log(`ONLY 지정 → ${list.length}개 시군구만 수집합니다.`);
+  }
+  return list;
+}
+
+// ── XML 파싱 (의존성 없이 item 단위로 추출) ───────────────
+function unescapeXml(s) {
+  return s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .trim();
+}
+
+function parseItems(xml) {
+  const items = [];
+  const itemRe = /<item[^>]*>([\s\S]*?)<\/item>/g;
+  let m;
+  while ((m = itemRe.exec(xml)) !== null) {
+    const body = m[1];
+    const obj = {};
+    const tagRe = /<([A-Za-z_][\w.\-]*)>([\s\S]*?)<\/\1>/g;
+    let t;
+    while ((t = tagRe.exec(body)) !== null) {
+      obj[t[1]] = unescapeXml(t[2]);
+    }
+    items.push(obj);
+  }
+  return items;
+}
+
+function slim(obj) {
+  const out = {};
+  for (const k of KEEP) {
+    if (obj[k] !== undefined && obj[k] !== '') out[k] = obj[k];
+  }
+  return out;
+}
+
+// ── 개발키 감지 ─────────────────────────────────────────
+function looksLikeDevKey(items) {
+  // 개발계정은 연령별 값이 01, 02 같은 더미로만 내려옴
+  const sample = items.slice(0, 20);
+  if (sample.length === 0) return false;
+  const dummy = sample.filter(it => {
+    const v = [it.child_cnt_00, it.child_cnt_01, it.child_cnt_02].filter(Boolean);
+    return v.length > 0 && v.every(x => x === '01' || x === '02' || x === '0');
+  });
+  return dummy.length === sample.length;
+}
+
+// ── HTTP ───────────────────────────────────────────────
+async function fetchRegion(code) {
+  const url = `${API_URL}?key=${encodeURIComponent(KEY)}&arcode=${encodeURIComponent(code)}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const xml = await res.text();
+    if (/<result[^>]*>\s*(?!00)/.test(xml) && /오류|error|ERROR/.test(xml) && !/<item[^>]*>/.test(xml)) {
+      throw new Error('API 오류 응답: ' + xml.slice(0, 200));
+    }
+    return parseItems(xml);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchWithRetry(code) {
+  let lastErr;
+  for (let i = 0; i <= RETRY; i++) {
+    try {
+      return await fetchRegion(code);
+    } catch (e) {
+      lastErr = e;
+      if (i < RETRY) await sleep(1000 * (i + 1));
+    }
+  }
+  throw lastErr;
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchRegion(region) {
-  const url = `${API}?key=${encodeURIComponent(KEY)}&arcode=${region.arcode}&stcode=`;
-  for (let attempt = 1; attempt <= RETRY; attempt++) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const xml = await res.text();
-      const rows = parseItems(xml);
-      if (!rows.length) throw new Error('결과가 비어 있습니다');
-      return rows;
-    } catch (e) {
-      console.warn(`  ${region.name} ${attempt}차 실패: ${e.message}`);
-      if (attempt === RETRY) throw e;
-      await sleep(3000 * attempt);
-    }
-  }
-}
-
+// ── 메인 ───────────────────────────────────────────────
 async function main() {
-  if (!KEY) {
-    console.error('CHILDCARE_KEY 환경변수가 없습니다. 인증키를 설정한 뒤 다시 실행하세요.');
-    process.exit(1);
-  }
+  const regions = loadRegions();
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-  const all = [];
+  const stamp = new Date().toISOString();
+  const results = [];
   const failed = [];
+  let devKeyWarned = false;
+  let cursor = 0;
 
-  for (const region of REGIONS) {
-    process.stdout.write(`${region.name} 수집 중... `);
-    try {
-      const rows = await fetchRegion(region);
-      const live = rows.filter(r => r.crstatusname !== '폐지');
-      all.push(...live);
-      console.log(`${live.length}곳`);
-    } catch (e) {
-      failed.push(region.name);
-      console.log('실패');
+  async function worker(id) {
+    while (cursor < regions.length) {
+      const r = regions[cursor++];
+      const n = cursor;
+      try {
+        const raw = await fetchWithRetry(r.code);
+        const items = raw.map(slim).filter(it => it.stcode);
+
+        if (items.length === 0) {
+          console.log(`  · ${r.code} ${r.name} — 결과 0건 (기존 파일 유지)`);
+          failed.push(r.code);
+          continue;
+        }
+
+        if (!devKeyWarned && looksLikeDevKey(items)) {
+          devKeyWarned = true;
+          console.warn('\n  ⚠ 개발계정 인증키로 보입니다. 연령별 숫자가 더미(01/02)입니다.');
+          console.warn('    운영계정 승인 후 인증키를 교체하세요.\n');
+        }
+
+        fs.writeFileSync(
+          path.join(DATA_DIR, `${r.code}.json`),
+          JSON.stringify({ arcode: r.code, name: r.name, updated: stamp, count: items.length, items })
+        );
+        results.push({ code: r.code, name: r.name, count: items.length });
+        console.log(`  ✓ ${r.code} ${r.name} — ${items.length}곳  (${n}/${regions.length})`);
+      } catch (e) {
+        failed.push(r.code);
+        console.log(`  ✗ ${r.code} ${r.name} — ${e.message} (기존 파일 유지)`);
+      }
+      await sleep(GAP_MS);
     }
-    await sleep(DELAY_MS);
   }
 
-  /* 전부 실패하면 기존 파일을 덮어쓰지 않습니다.
-     빈 화면을 보여주느니 어제 데이터를 그대로 두는 편이 낫습니다. */
-  if (!all.length) {
-    console.error('수집된 데이터가 없어 파일을 갱신하지 않습니다.');
+  console.log(`\n수집 시작: ${regions.length}개 시군구\n`);
+  await Promise.all(Array.from({ length: CONCURRENCY }, (_, i) => worker(i)));
+
+  // 전부 실패하면 index.json 도 건드리지 않음
+  if (results.length === 0) {
+    console.error('\n모든 시군구 수집 실패. 기존 데이터를 그대로 둡니다.');
     process.exit(1);
   }
 
-  const outPath = path.join(__dirname, 'data', 'childcare.json');
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, JSON.stringify(all, null, 0), 'utf8');
-
-  const meta = {
-    updatedAt : new Date().toISOString(),
-    count     : all.length,
-    regions   : REGIONS.map(r => r.name),
-    failed
-  };
-  fs.writeFileSync(path.join(__dirname, 'data', 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
-
-  console.log(`\n총 ${all.length}곳 저장 완료`);
-  if (failed.length) console.log(`실패한 지역: ${failed.join(', ')}`);
-
-  /* 개발키로 돌리면 값이 01, 02 같은 더미로 나옵니다. 바로 알려줍니다. */
-  const sample = all.find(r => r.crcapat != null);
-  if (sample && sample.crcapat < 5 && sample.crchcnt < 5) {
-    console.warn('\n⚠ 정원·현원 값이 비정상적으로 작습니다. 개발계정 키를 쓰고 계신 것 같습니다.');
-    console.warn('  실제 숫자를 받으려면 운영계정 인증키가 필요합니다.');
+  // 이번에 실패한 시군구는 기존 index 정보를 살려둠
+  let prev = { regions: [] };
+  const indexPath = path.join(DATA_DIR, 'index.json');
+  if (fs.existsSync(indexPath)) {
+    try { prev = JSON.parse(fs.readFileSync(indexPath, 'utf8')); } catch (_) {}
   }
+  const merged = new Map((prev.regions || []).map(r => [r.code, r]));
+  for (const r of results) merged.set(r.code, r);
+
+  fs.writeFileSync(indexPath, JSON.stringify({
+    updated: stamp,
+    total: [...merged.values()].reduce((s, r) => s + (r.count || 0), 0),
+    regions: [...merged.values()].sort((a, b) => a.code.localeCompare(b.code)),
+  }));
+
+  console.log(`\n완료: 성공 ${results.length}곳 / 실패 ${failed.length}곳`);
+  if (failed.length) console.log(`실패 목록: ${failed.join(', ')}`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => {
+  console.error('예상치 못한 오류:', e);
+  process.exit(1);
+});
